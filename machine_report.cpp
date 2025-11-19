@@ -61,12 +61,10 @@ constexpr const char* BLUE = "\033[38;5;117m";
 constexpr const char* RESET = "\033[0m";
 constexpr const char* BOLD = "\033[1m";
 
-// Cute kaomoji/emoji
-constexpr const char* KAWAII_CPU = "ᕙ(⇀‸↼‶)ᕗ";
-constexpr const char* KAWAII_MEM = "(｡◕‿◕｡)";
-constexpr const char* KAWAII_DISK = "✧(｡•̀ᴗ-)✧";
-constexpr const char* KAWAII_NET = "(◕‿◕✿)";
-constexpr const char* KAWAII_TIME = "⸜(｡˃ ᵕ ˂ )⸝♡";
+constexpr const char* JAPANESE_CPU = "しょり";
+constexpr const char* JAPANESE_MEM = "きおく";
+constexpr const char* JAPANESE_DISK = "きおくいき";
+constexpr const char* JAPANESE_TIME = "じこく";
 
 // Your existing constants
 constexpr int MIN_NAME_LEN = 5;
@@ -91,6 +89,12 @@ inline std::string execCommand(const char *cmd) {
   if (!result.empty() && result.back() == '\n') {
     result.pop_back();
   }
+  return result;
+}
+
+inline std::string toLower(const std::string& str) {
+  std::string result = str;
+  std::transform(result.begin(), result.end(), result.begin(), ::tolower);
   return result;
 }
 
@@ -169,14 +173,14 @@ inline size_t maxLength(const std::vector<std::string> &strings) {
 inline std::string formatBytes(uint64_t bytes) {
   const double gb = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
   std::stringstream ss;
-  ss << std::fixed << std::setprecision(2) << gb;
+  ss << static_cast<int>(gb + 0.5);
   return ss.str();
 }
 
 inline std::string formatGiB(uint64_t bytes) {
   const double gib = static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
   std::stringstream ss;
-  ss << std::fixed << std::setprecision(2) << gib;
+  ss << static_cast<int>(gib + 0.5);
   return ss.str();
 }
 
@@ -206,15 +210,55 @@ inline std::string drawBarGraph(double percent, int width) {
 
 // Cutified: still efficient
 inline void printHeader(int current_len) {
+  const int length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING;
+  std::string top = PINK;
+  top += "╭";
+  for (int i = 0; i < length - 2; ++i) {
+    top += "─";
+  }
+  top += "╮";
+  top += RESET;
+  std::cout << top << '\n';
 }
 
 inline void printCenteredData(const std::string &text, int current_len, const char* color = CYAN) {
-  std::cout << color << BOLD << text << RESET << "\n";
+  const int max_len = current_len + MAX_NAME_LEN - BORDERS_AND_PADDING;
+  const int total_width = max_len + 12;
+  int padding_left = (total_width - static_cast<int>(getDisplayWidth(text))) / 2;
+  int padding_right = total_width - static_cast<int>(getDisplayWidth(text)) - padding_left;
+  if (padding_left < 0) padding_left = 0;
+  if (padding_left > 1000) padding_left = 1000;
+  if (padding_right < 0) padding_right = 0;
+  if (padding_right > 1000) padding_right = 1000;
+  std::cout << PURPLE << "│" << RESET << std::string(padding_left, ' ') 
+            << color << BOLD << text << RESET
+            << std::string(padding_right, ' ') << PURPLE << "│" << RESET << "\n";
 }
 
 // Cute dividers
 inline void printDivider(const std::string &side, int current_len) {
-  std::cout << '\n';
+  const char *left_symbol, *right_symbol;
+  const char* color = CYAN;
+
+  if (side == "top") {
+    left_symbol = "├";
+    right_symbol = "┤";
+  } else if (side == "bottom") {
+    left_symbol = "╰";
+    right_symbol = "╯";
+  } else {
+    left_symbol = "├";
+    right_symbol = "┤";
+  }
+
+  const int length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING;
+  std::string divider = color;
+  divider += left_symbol;
+  for (int i = 0; i < length - 2; ++i)
+    divider += "─";
+  divider += right_symbol;
+  divider += RESET;
+  std::cout << divider << '\n';
 }
 
 inline void printData(std::string name, std::string data, int current_len,
@@ -231,18 +275,43 @@ inline void printData(std::string name, std::string data, int current_len,
   const size_t label_width = MAX_NAME_LEN;
   size_t name_padding = (name_display_width < label_width) ? (label_width - name_display_width) : 0;
 
-  std::string emoji_str = (emoji && *emoji) ? std::string(emoji) + " " : "";
+  std::string japanese_str = (emoji && *emoji) ? std::string(emoji) + " " : "";
+  size_t japanese_display_width = (emoji && *emoji) ? getDisplayWidth(japanese_str) : 0;
+  
+  const size_t left_border = 2;
+  const size_t right_border = 2;
+  const size_t colon = 1;
+  const size_t spacing = 2;
+  size_t total_box_width = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING;
+  size_t fixed_elements_width = left_border + name_display_width + colon + name_padding + spacing + japanese_display_width;
+  size_t target_data_width = total_box_width - fixed_elements_width - right_border;
   
   if (is_graph) {
-    std::cout << color << BOLD << name << RESET << ":"
-              << std::string(name_padding, ' ') << "  " << emoji_str << data << "\n";
+    size_t graph_display_width = getDisplayWidth(data);
+    size_t data_padding = 0;
+    size_t total_content_width = left_border + name_display_width + colon + name_padding + spacing + 
+                                 japanese_display_width + graph_display_width + right_border;
+    if (total_content_width < total_box_width) {
+      data_padding = total_box_width - total_content_width;
+    }
+    std::cout << PURPLE << "│ " << RESET << color << BOLD << name << RESET << ":"
+              << std::string(name_padding, ' ') << "  " << japanese_str << data
+              << std::string(data_padding, ' ') << PURPLE << " │" << RESET << "\n";
   } else {
     size_t data_display_width = getDisplayWidth(data);
     if (data_display_width >= MAX_DATA_LEN) {
       data = data.substr(0, MAX_DATA_LEN - 4) + "...";
+      data_display_width = getDisplayWidth(data);
     }
-    std::cout << color << BOLD << name << RESET << ":"
-              << std::string(name_padding, ' ') << "  " << emoji_str << data << "\n";
+    size_t data_padding = 0;
+    size_t total_content_width = left_border + name_display_width + colon + name_padding + spacing + 
+                                 japanese_display_width + data_display_width + right_border;
+    if (total_content_width < total_box_width) {
+      data_padding = total_box_width - total_content_width;
+    }
+    std::cout << PURPLE << "│ " << RESET << color << BOLD << name << RESET << ":"
+              << std::string(name_padding, ' ') << "  " << japanese_str << data
+              << std::string(data_padding, ' ') << PURPLE << " │" << RESET << "\n";
   }
 }
 
@@ -489,13 +558,37 @@ inline LoginInfo getLastLogin() {
       tokens.push_back(token);
     }
     if (tokens.size() >= 6) {
-      info.time = tokens[2] + " " + tokens[3] + " " + tokens[4] + " " + tokens[5];
-      info.ip_present = false;
-    } else if (tokens.size() >= 4) {
-      info.time = tokens[2] + " " + tokens[3];
-      if (tokens.size() >= 5) {
-        info.time += " " + tokens[4];
+      std::string day = tokens[2];
+      std::string time_str;
+      for (size_t i = 3; i < tokens.size(); ++i) {
+        size_t colon_pos = tokens[i].find(':');
+        if (colon_pos != std::string::npos && colon_pos == 2) {
+          time_str = tokens[i];
+          break;
+        }
       }
+      if (!time_str.empty()) {
+        size_t colon_pos = time_str.find(':');
+        int hour = std::stoi(time_str.substr(0, colon_pos));
+        std::string minute = time_str.substr(colon_pos + 1);
+        if (minute.length() > 2) {
+          minute = minute.substr(0, 2);
+        }
+        std::string period = (hour < 12) ? "AM" : "PM";
+        if (hour == 0) {
+          hour = 12;
+        } else if (hour > 12) {
+          hour -= 12;
+        }
+        std::stringstream ss;
+        ss << day << " " << hour << ":" << minute << " " << period;
+        info.time = ss.str();
+      } else {
+        info.time = day;
+      }
+      info.ip_present = false;
+    } else if (tokens.size() >= 3) {
+      info.time = tokens[2];
       info.ip_present = false;
     } else {
       info.time = "N/A";
@@ -521,11 +614,11 @@ int main() {
   auto future_client_ip = std::async(std::launch::async, getClientIP);
   auto future_login = std::async(std::launch::async, getLastLogin);
 
-  const std::string os_name = getOSName();
-  const std::string os_kernel = getKernelVersion();
-  const std::string net_hostname = getHostname();
-  const std::string net_machine_ip = getMachineIP();
-  const std::string net_current_user = getCurrentUser();
+  std::string os_name = toLower(getOSName());
+  std::string os_kernel = toLower(getKernelVersion());
+  std::string net_hostname = toLower(getHostname());
+  std::string net_machine_ip = getMachineIP();
+  std::string net_current_user = toLower(getCurrentUser());
 
   const CPUInfo cpu = getCPUInfo();
   const MemInfo mem = getMemInfo();
@@ -535,36 +628,33 @@ int main() {
   const std::string net_client_ip = future_client_ip.get();
   const LoginInfo login = future_login.get();
 
-  const std::string cpu_cores_str = std::to_string(cpu.cores_physical) +
-                                    " vCPU(s) / " +
-                                    std::to_string(cpu.sockets) + " Socket(s)";
+  const std::string cpu_cores_str = std::to_string(cpu.cores_physical) + " cores";
 
   const double usage_percent = (cpu.load_1 / cpu.cores_logical) * 100.0;
   std::stringstream usage_ss;
-  usage_ss << std::fixed << std::setprecision(2) << usage_percent << "%";
+  usage_ss << static_cast<int>(usage_percent + 0.5) << "%";
   const std::string cpu_usage_str = usage_ss.str();
 
   std::stringstream mem_str_ss;
-  mem_str_ss << formatGiB(mem.used) << "/" << formatGiB(mem.total) << " GiB ["
-             << std::fixed << std::setprecision(2) << mem.percent << "%]";
+  mem_str_ss << formatGiB(mem.used) << "/" << formatGiB(mem.total) << " gib ["
+             << static_cast<int>(mem.percent + 0.5) << "%]";
   const std::string mem_usage_str = mem_str_ss.str();
 
   std::stringstream disk_str_ss;
   disk_str_ss << formatBytes(disk.used) << "/" << formatBytes(disk.total)
-              << " GB [" << std::fixed << std::setprecision(2) << disk.percent
-              << "%]";
+              << " gb [" << static_cast<int>(disk.percent + 0.5) << "%]";
   const std::string disk_usage_str = disk_str_ss.str();
 
-  std::string cpu_model_with_kaomoji = std::string(KAWAII_CPU) + " " + cpu.model;
-  std::string disk_usage_with_kaomoji = std::string(KAWAII_DISK) + " " + disk_usage_str;
-  std::string mem_usage_with_kaomoji = std::string(KAWAII_MEM) + " " + mem_usage_str;
-  std::string login_time_with_kaomoji = std::string(KAWAII_TIME) + " " + login.time;
+  std::string cpu_model_with_japanese = std::string(JAPANESE_CPU) + " " + toLower(cpu.model);
+  std::string disk_usage_with_japanese = std::string(JAPANESE_DISK) + " " + disk_usage_str;
+  std::string mem_usage_with_japanese = std::string(JAPANESE_MEM) + " " + mem_usage_str;
+  std::string login_time_with_japanese = std::string(JAPANESE_TIME) + " " + toLower(login.time);
 
   std::vector<std::string> all_strings = {
       REPORT_TITLE,   os_name,       os_kernel,        net_hostname,
-      net_machine_ip, net_client_ip, net_current_user, cpu_model_with_kaomoji,
-      cpu_cores_str,  "Bare Metal",  cpu_usage_str,    mem_usage_with_kaomoji,
-      disk_usage_with_kaomoji, login_time_with_kaomoji, login.ip, login.uptime};
+      net_machine_ip, net_client_ip, net_current_user, cpu_model_with_japanese,
+      cpu_cores_str,  "Bare Metal",  cpu_usage_str,    mem_usage_with_japanese,
+      disk_usage_with_japanese, login_time_with_japanese, login.ip, login.uptime};
 
   const int current_len = maxLength(all_strings);
 
@@ -588,38 +678,38 @@ int main() {
   printCenteredData("uwu TR-1000 Machine Report (◕‿◕✿)", current_len, CYAN);
   printDivider("top", current_len);
 
-  printData("OS", os_name, current_len, CYAN, "");
-  printData("KERNEL", os_kernel, current_len, CYAN, "");
+  printData("os", os_name, current_len, CYAN, "");
+  printData("kernel", os_kernel, current_len, CYAN, "");
   printDivider("", current_len);
 
-  printData("HOSTNAME", net_hostname, current_len, BLUE, "");
-  printData("MACHINE IP", net_machine_ip, current_len, BLUE, "");
-  printData("CLIENT IP", net_client_ip, current_len, BLUE, "");
+  printData("hostname", net_hostname, current_len, BLUE, "");
+  printData("machine ip", net_machine_ip, current_len, BLUE, "");
+  printData("client ip", toLower(net_client_ip), current_len, BLUE, "");
   for (size_t i = 0; i < net_dns_ip.size(); ++i) {
-    printData("DNS IP " + std::to_string(i + 1), net_dns_ip[i], current_len, BLUE, "");
+    printData("dns ip " + std::to_string(i + 1), net_dns_ip[i], current_len, BLUE, "");
   }
-  printData("USER", net_current_user, current_len, PURPLE, "");
+  printData("user", net_current_user, current_len, PURPLE, "");
   printDivider("", current_len);
 
-  printData("PROCESSOR", cpu.model, current_len, YELLOW, KAWAII_CPU);
-  printData("CORES", cpu_cores_str, current_len, YELLOW, "");
-  printData("HYPERVISOR", "Bare Metal", current_len, YELLOW, "");
-  printData("CPU USAGE", cpu_usage_str, current_len, YELLOW, "");
-  printData("LOAD 1m", cpu_1_graph, current_len, GREEN, "");
-  printData("LOAD 5m", cpu_5_graph, current_len, GREEN, "");
-  printData("LOAD 15m", cpu_15_graph, current_len, GREEN, "");
+  printData("processor", toLower(cpu.model), current_len, YELLOW, JAPANESE_CPU);
+  printData("cores", cpu_cores_str, current_len, YELLOW, "");
+  printData("hypervisor", "bare metal", current_len, YELLOW, "");
+  printData("cpu usage", cpu_usage_str, current_len, YELLOW, "");
+  printData("load 1m", cpu_1_graph, current_len, GREEN, "");
+  printData("load 5m", cpu_5_graph, current_len, GREEN, "");
+  printData("load 15m", cpu_15_graph, current_len, GREEN, "");
   printDivider("", current_len);
 
-  printData("VOLUME", disk_usage_str, current_len, PINK, KAWAII_DISK);
-  printData("DISK USAGE", disk_graph, current_len, PINK, "");
+  printData("volume", disk_usage_str, current_len, PINK, JAPANESE_DISK);
+  printData("disk usage", disk_graph, current_len, PINK, "");
   printDivider("", current_len);
 
-  printData("MEMORY", mem_usage_str, current_len, PURPLE, KAWAII_MEM);
-  printData("USAGE", mem_graph, current_len, PURPLE, "");
+  printData("memory", mem_usage_str, current_len, PURPLE, JAPANESE_MEM);
+  printData("usage", mem_graph, current_len, PURPLE, "");
   printDivider("", current_len);
 
-  printData("LAST LOGIN", login.time, current_len, CYAN, KAWAII_TIME);
-  printData("UPTIME", login.uptime, current_len, GREEN, "");
+  printData("last login", toLower(login.time), current_len, CYAN, JAPANESE_TIME);
+  printData("uptime", toLower(login.uptime), current_len, GREEN, "");
 
   printDivider("bottom", current_len);
 
