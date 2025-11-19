@@ -1,9 +1,12 @@
-# Mac Report
+# Mac Report (uwu edition)
 
-A high-performance, optimized C++ application that generates a detailed system status report for macOS. This tool is a native port of a Linux shell script, designed to provide accurate system metrics with a clean, text-based user interface.
+A high-performance, optimized C++ application that generates a detailed system status report for macOS. This is an **uwufied** version of the original project, featuring cute kaomoji (ᕙ(⇀‸↼‶)ᕗ), pastel colors, and adorable ASCII art while maintaining all the performance optimizations and accuracy of the original.
+
+This tool is a native port of a Linux shell script, designed to provide accurate system metrics with a kawaii, text-based user interface.
 
 ## Features
 
+- **uwu aesthetic**: Cute kaomoji, pastel colors, and adorable formatting ✧(｡•̀ᴗ-)✧
 - **System Information**: OS version, Kernel version, Hostname
 - **Network**: Machine IP, Client IP (if connected via SSH), DNS servers
 - **CPU**: Processor model, Core count (Physical/Logical), Socket count, and CPU Usage percentage
@@ -119,34 +122,32 @@ The asynchronous architecture allows the program to:
 ## Example Output
 
 ```
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│            SYSTEM STATUS REPORT            │
-│           TR-1000 MACHINE REPORT           │
-├───────────────┬────────────────────────────┤
-│ OS            │ macOS 15.6.1               │
-│ KERNEL        │ Darwin 24.6.0              │
-├───────────────┼────────────────────────────┤
-│ HOSTNAME      │ Lakshits-MacBook-Pro.local │
-│ MACHINE IP    │ 00.00.0.000                │
-│ CLIENT  IP    │ Local Session              │
-│ DNS  IP 1     │ 192.0.2.2                  │
-│ USER          │ verma                      │
-├───────────────┼────────────────────────────┤
-│ PROCESSOR     │ Apple M3 Pro               │
-│ CORES         │ 11 vCPU(s) / 1 Socket(s)   │
-│ CPU USAGE     │ 18.97%                     │
-│ LOAD  1m      │ ████░░░░░░░░░░░░░░░░░░░░░░ │
-├───────────────┼────────────────────────────┤
-│ VOLUME        │ 360.42/460.43 GB [78.28%]  │
-│ DISK USAGE    │ ████████████████████░░░░░░ │
-├───────────────┼────────────────────────────┤
-│ MEMORY        │ 8.39/18.00 GiB [46.59%]    │
-│ USAGE         │ ████████████░░░░░░░░░░░░░░ │
-├───────────────┼────────────────────────────┤
-│ LAST LOGIN    │ Wed Nov 19 04:37           │
-│ UPTIME        │ 10d 9h 45m                 │
-└───────────────┴────────────────────────────┘
+✧･ﾟ: *✧･ﾟ:* SYSTEM STATUS REPORT *:･ﾟ✧*:･ﾟ✧
+uwu TR-1000 Machine Report (◕‿◕✿)
+
+OS:             macOS 26.1
+KERNEL:         Darwin Kernel Version 25.1.0...
+
+HOSTNAME:       Priyanshus-MacBook-Air.local
+MACHINE IP:     10.146.3.51
+CLIENT IP:      N/A
+DNS IP 1:       45.112.149.2
+USER:           priyanshusharma
+
+PROCESSOR:      ᕙ(⇀‸↼‶)ᕗ Apple M2
+CORES:          8 vCPU(s) / 1 Socket(s)
+HYPERVISOR:     Bare Metal
+CPU USAGE:      27.06%
+LOAD 1m:        ▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱
+
+VOLUME:         ✧(｡•̀ᴗ-)✧ 130.85/228.27 GB [57.32%]
+DISK USAGE:     ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱
+
+MEMORY:         (｡◕‿◕｡) 7.94/16.00 GiB [49.60%]
+USAGE:          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱
+
+LAST LOGIN:     ⸜(｡˃ ᵕ ˂ )⸝♡ Wed Nov 19 22:34
+UPTIME:          3:22
 ```
 
 ## Technical Details
@@ -172,7 +173,9 @@ This project is licensed under the BSD 3-Clause License. See the source code hea
 
 ## Acknowledgments
 
-Modified from United States Graphics Company's shell script: https://github.com/usgraphics/usgc-machine-report
+This is an **uwufied** version of the original project, adding cute kaomoji, pastel colors, and adorable formatting while maintaining all performance optimizations.
+
+Original project: United States Graphics Company's shell script - https://github.com/usgraphics/usgc-machine-report
 
 ## Contributing
 
