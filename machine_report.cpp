@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2025, Lakshit Verma
  * All rights reserved.
- *
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- *
+ * 
  * 1. Redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- *
+ * 
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- *
+ * 
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -38,17 +38,37 @@
 #include <iostream>
 #include <mach/mach.h>
 #include <mach/mach_host.h>
+#include <memory>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pwd.h>
 #include <sstream>
 #include <string>
 #include <sys/mount.h>
+#include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
 
+// Cute pastel color constants
+constexpr const char* PINK = "\033[38;5;213m";
+constexpr const char* CYAN = "\033[38;5;159m";
+constexpr const char* PURPLE = "\033[38;5;183m";
+constexpr const char* YELLOW = "\033[38;5;229m";
+constexpr const char* GREEN = "\033[38;5;156m";
+constexpr const char* BLUE = "\033[38;5;117m";
+constexpr const char* RESET = "\033[0m";
+constexpr const char* BOLD = "\033[1m";
+
+// Cute kaomoji/emoji
+constexpr const char* KAWAII_CPU = "ᕙ(⇀‸↼‶)ᕗ";
+constexpr const char* KAWAII_MEM = "(｡◕‿◕｡)";
+constexpr const char* KAWAII_DISK = "✧(｡•̀ᴗ-)✧";
+constexpr const char* KAWAII_NET = "(◕‿◕✿)";
+constexpr const char* KAWAII_TIME = "⸜(｡˃ ᵕ ˂ )⸝♡";
+
+// Your existing constants
 constexpr int MIN_NAME_LEN = 5;
 constexpr int MAX_NAME_LEN = 13;
 constexpr int MIN_DATA_LEN = 20;
@@ -56,6 +76,7 @@ constexpr int MAX_DATA_LEN = 32;
 constexpr int BORDERS_AND_PADDING = 7;
 constexpr const char *REPORT_TITLE = "SYSTEM STATUS REPORT";
 
+// Function to execute shell command
 inline std::string execCommand(const char *cmd) {
   std::array<char, 128> buffer;
   std::string result;
@@ -73,15 +94,76 @@ inline std::string execCommand(const char *cmd) {
   return result;
 }
 
+inline size_t getDisplayWidth(const std::string& str) {
+  size_t width = 0;
+  for (size_t i = 0; i < str.length(); ) {
+    unsigned char c = static_cast<unsigned char>(str[i]);
+    if (c == 0x1B) {
+      size_t j = i + 1;
+      if (j < str.length() && str[j] == '[') {
+        j++;
+        while (j < str.length()) {
+          unsigned char ch = static_cast<unsigned char>(str[j]);
+          if (ch >= 0x40 && ch <= 0x7E) {
+            i = j + 1;
+            break;
+          }
+          if (ch < 0x20 || ch > 0x3F) {
+            break;
+          }
+          j++;
+        }
+        if (j >= str.length()) {
+          i = str.length();
+        }
+        continue;
+      }
+      width += 1;
+      i += 1;
+    } else if ((c & 0x80) == 0) {
+      width += 1;
+      i += 1;
+    } else if ((c & 0xE0) == 0xC0) {
+      if (i + 1 < str.length()) {
+        unsigned char c1 = static_cast<unsigned char>(str[i + 1]);
+        if ((c == 0xC2 && c1 >= 0xA1 && c1 <= 0xAF) || (c == 0xC3 && c1 >= 0x80 && c1 <= 0xBF)) {
+          width += 1;
+        } else {
+          width += 2;
+        }
+      } else {
+        width += 2;
+      }
+      i += 2;
+    } else if ((c & 0xF0) == 0xE0) {
+      width += 1;
+      i += 3;
+    } else if ((c & 0xF8) == 0xF0) {
+      width += 2;
+      i += 4;
+    } else {
+      width += 1;
+      i += 1;
+    }
+  }
+  return width;
+}
+
 inline size_t maxLength(const std::vector<std::string> &strings) {
-  size_t max_len = 0;
+  size_t max_len = MIN_DATA_LEN;
   for (const auto &str : strings) {
-    const size_t len = str.length();
+    const size_t len = getDisplayWidth(str);
     if (len > max_len) {
       max_len = len;
     }
   }
-  return (max_len < MAX_DATA_LEN) ? max_len : MAX_DATA_LEN;
+  if (max_len > MAX_DATA_LEN) {
+    max_len = MAX_DATA_LEN;
+  }
+  if (max_len < MIN_DATA_LEN) {
+    max_len = MIN_DATA_LEN;
+  }
+  return max_len;
 }
 
 inline std::string formatBytes(uint64_t bytes) {
@@ -98,280 +180,81 @@ inline std::string formatGiB(uint64_t bytes) {
   return ss.str();
 }
 
+// Gradient bar graph with blocks, cute dim
 inline std::string drawBarGraph(double percent, int width) {
   const int num_blocks = static_cast<int>((percent / 100.0) * width);
   std::string graph;
-  graph.reserve(width * 3);
+  graph.reserve(width * 8);
+  const char* bar_color;
+  if (percent < 50) {
+    bar_color = GREEN;
+  } else if (percent < 75) {
+    bar_color = YELLOW;
+  } else {
+    bar_color = PINK;
+  }
+  graph += bar_color;
   for (int i = 0; i < num_blocks; ++i)
-    graph += "█";
+    graph += "▰";
+  graph += RESET;
+  graph += "\033[2m";
   for (int i = num_blocks; i < width; ++i)
-    graph += "░";
+    graph += "▱";
+  graph += RESET;
   return graph;
 }
 
+// Cutified: still efficient
 inline void printHeader(int current_len) {
-  const int length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING;
-  std::string top = "┌";
-  std::string bottom = "├";
-  top.reserve(length);
-  bottom.reserve(length);
-  for (int i = 0; i < length - 2; ++i) {
-    top += "┬";
-    bottom += "┴";
-  }
-  top += "┐";
-  bottom += "┤";
-  std::cout << top << '\n' << bottom << '\n';
 }
 
-inline void printCenteredData(const std::string &text, int current_len) {
-  const int max_len = current_len + MAX_NAME_LEN - BORDERS_AND_PADDING;
-  const int total_width = max_len + 12;
-  const int padding_left = (total_width - text.length()) / 2;
-  const int padding_right = total_width - text.length() - padding_left;
-
-  std::cout << "│" << std::string(padding_left, ' ') << text
-            << std::string(padding_right, ' ') << "│\n";
+inline void printCenteredData(const std::string &text, int current_len, const char* color = CYAN) {
+  std::cout << color << BOLD << text << RESET << "\n";
 }
 
+// Cute dividers
 inline void printDivider(const std::string &side, int current_len) {
-  const char *left_symbol, *middle_symbol, *right_symbol;
-  if (side == "top") {
-    left_symbol = "├";
-    middle_symbol = "┬";
-    right_symbol = "┤";
-  } else if (side == "bottom") {
-    left_symbol = "└";
-    middle_symbol = "┴";
-    right_symbol = "┘";
-  } else {
-    left_symbol = "├";
-    middle_symbol = "┼";
-    right_symbol = "┤";
-  }
-
-  const int length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING;
-  std::string divider = left_symbol;
-  divider.reserve(length);
-  for (int i = 0; i < length - 3; ++i) {
-    divider += "─";
-    if (i == 14)
-      divider += middle_symbol;
-  }
-  divider += right_symbol;
-  std::cout << divider << '\n';
+  std::cout << '\n';
 }
 
-inline void printData(std::string name, std::string data, int current_len) {
+inline void printData(std::string name, std::string data, int current_len,
+                     const char* color = RESET, const char* emoji = "") {
   if (name.length() > MAX_NAME_LEN) {
     name = name.substr(0, MAX_NAME_LEN - 3) + "...";
   }
-
-  if (name.length() < MAX_NAME_LEN) {
-    name.resize(MAX_NAME_LEN, ' ');
-  }
-
+  
   const bool is_graph = (data.find("█") != std::string::npos ||
-                         data.find("░") != std::string::npos);
+                         data.find("░") != std::string::npos ||
+                         data.find("▰") != std::string::npos);
 
+  size_t name_display_width = getDisplayWidth(name);
+  const size_t label_width = MAX_NAME_LEN;
+  size_t name_padding = (name_display_width < label_width) ? (label_width - name_display_width) : 0;
+
+  std::string emoji_str = (emoji && *emoji) ? std::string(emoji) + " " : "";
+  
   if (is_graph) {
-    const size_t num_blocks = data.length() / 3;
-    if (num_blocks < static_cast<size_t>(current_len)) {
-      data += std::string(current_len - num_blocks, ' ');
-    }
+    std::cout << color << BOLD << name << RESET << ":"
+              << std::string(name_padding, ' ') << "  " << emoji_str << data << "\n";
   } else {
-    if (data.length() >= MAX_DATA_LEN) {
+    size_t data_display_width = getDisplayWidth(data);
+    if (data_display_width >= MAX_DATA_LEN) {
       data = data.substr(0, MAX_DATA_LEN - 4) + "...";
-    } else if (data.length() < static_cast<size_t>(current_len)) {
-      data.resize(current_len, ' ');
     }
+    std::cout << color << BOLD << name << RESET << ":"
+              << std::string(name_padding, ' ') << "  " << emoji_str << data << "\n";
   }
-
-  std::cout << "│ " << name << " │ " << data << " │\n";
-}
-
-inline std::string getOSName() {
-  static std::string cached_os_name;
-  if (cached_os_name.empty()) {
-    const std::string name = execCommand("sw_vers -productName");
-    const std::string version = execCommand("sw_vers -productVersion");
-    cached_os_name = name + " " + version;
-  }
-  return cached_os_name;
-}
-
-inline std::string getKernelVersion() {
-  static std::string cached_kernel;
-  if (cached_kernel.empty()) {
-    char str[256];
-    size_t size = sizeof(str);
-    cached_kernel = "Darwin";
-    if (sysctlbyname("kern.osrelease", str, &size, NULL, 0) == 0) {
-      cached_kernel += " ";
-      cached_kernel += str;
-    }
-  }
-  return cached_kernel;
-}
-
-inline std::string getHostname() {
-  static std::string cached_hostname;
-  if (cached_hostname.empty()) {
-    char hostname[256];
-    if (gethostname(hostname, sizeof(hostname)) == 0) {
-      cached_hostname = hostname;
-    } else {
-      cached_hostname = "Not Defined";
-    }
-  }
-  return cached_hostname;
-}
-
-inline std::string getMachineIP() {
-  struct ifaddrs *ifaddr, *ifa;
-  std::string ip = "No IP found";
-
-  if (getifaddrs(&ifaddr) == -1)
-    return ip;
-
-  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == NULL)
-      continue;
-
-    const char *iface = ifa->ifa_name;
-    if (iface[0] == 'l' && iface[1] == 'o' && iface[2] == '0')
-      continue;
-    if (iface[0] == 'd' && iface[1] == 'o' && iface[2] == 'c')
-      continue;
-
-    if (ifa->ifa_addr->sa_family == AF_INET) {
-      char host[NI_MAXHOST];
-      if (getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host,
-                      NI_MAXHOST, NULL, 0, NI_NUMERICHOST) == 0) {
-        if (host[0] != '1' || host[1] != '2' || host[2] != '7') {
-          ip = host;
-          break;
-        }
-      }
-    }
-  }
-  freeifaddrs(ifaddr);
-  return ip;
-}
-
-inline std::string getClientIP() {
-  const char *ssh_client = getenv("SSH_CLIENT");
-  if (ssh_client) {
-    std::stringstream ss(ssh_client);
-    std::string ip;
-    ss >> ip;
-    return ip;
-  }
-
-  const std::string output = execCommand("who am i");
-  if (output.empty())
-    return "Not connected";
-
-  const size_t start = output.find('(');
-  const size_t end = output.find(')');
-  if (start != std::string::npos && end != std::string::npos && end > start) {
-    return output.substr(start + 1, end - start - 1);
-  }
-
-  return "Local Session";
-}
-
-inline std::vector<std::string> getDNS() {
-  static std::vector<std::string> cached_dns;
-  if (cached_dns.empty()) {
-    cached_dns.reserve(3);
-    const std::string output =
-        execCommand("scutil --dns | grep 'nameserver\\[0\\]' | sed "
-                    "'s/.*nameserver\\[0\\] : \\([0-9.]*\\).*/\\1/' | head -3");
-    std::stringstream ss(output);
-    std::string line;
-    while (std::getline(ss, line)) {
-      if (!line.empty())
-        cached_dns.push_back(line);
-    }
-  }
-  return cached_dns;
 }
 
 struct CPUInfo {
   std::string model;
   int cores_physical;
-  int sockets;
-  double freq_ghz;
-  double load_1, load_5, load_15;
   int cores_logical;
-};
-
-struct CPUStaticInfo {
-  std::string model;
-  int cores_physical;
   int sockets;
-  double freq_ghz;
-  int cores_logical;
+  double load_1;
+  double load_5;
+  double load_15;
 };
-
-inline CPUStaticInfo getCPUStaticInfo() {
-  static CPUStaticInfo cached_info{};
-  static bool initialized = false;
-
-  if (!initialized) {
-    char str[256];
-    size_t size = sizeof(str);
-    int val;
-    size_t int_size = sizeof(val);
-    int64_t freq = 0;
-    size_t freq_size = sizeof(freq);
-
-    if (sysctlbyname("machdep.cpu.brand_string", str, &size, NULL, 0) == 0)
-      cached_info.model = str;
-    if (sysctlbyname("hw.physicalcpu", &val, &int_size, NULL, 0) == 0)
-      cached_info.cores_physical = val;
-    if (sysctlbyname("hw.packages", &val, &int_size, NULL, 0) == 0)
-      cached_info.sockets = val;
-
-    if (sysctlbyname("hw.cpufrequency", &freq, &freq_size, NULL, 0) != 0 ||
-        freq == 0) {
-      if (sysctlbyname("hw.cpufrequency_max", &freq, &freq_size, NULL, 0) !=
-              0 ||
-          freq == 0) {
-        freq = 0;
-      }
-    }
-    cached_info.freq_ghz = static_cast<double>(freq) / 1000000000.0;
-
-    if (sysctlbyname("hw.ncpu", &val, &int_size, NULL, 0) == 0)
-      cached_info.cores_logical = val;
-
-    initialized = true;
-  }
-
-  return cached_info;
-}
-
-inline CPUInfo getCPUInfo() {
-  const CPUStaticInfo static_info = getCPUStaticInfo();
-
-  CPUInfo info{};
-  info.model = static_info.model;
-  info.cores_physical = static_info.cores_physical;
-  info.sockets = static_info.sockets;
-  info.freq_ghz = static_info.freq_ghz;
-  info.cores_logical = static_info.cores_logical;
-
-  double load[3];
-  if (getloadavg(load, 3) != -1) {
-    info.load_1 = load[0];
-    info.load_5 = load[1];
-    info.load_15 = load[2];
-  }
-
-  return info;
-}
 
 struct MemInfo {
   uint64_t total;
@@ -379,57 +262,11 @@ struct MemInfo {
   double percent;
 };
 
-inline MemInfo getMemInfo() {
-  MemInfo info{};
-
-  static int64_t cached_total_mem = 0;
-  if (cached_total_mem == 0) {
-    int64_t mem_size;
-    size_t size = sizeof(mem_size);
-    if (sysctlbyname("hw.memsize", &mem_size, &size, NULL, 0) == 0)
-      cached_total_mem = mem_size;
-  }
-  info.total = cached_total_mem;
-
-  static const long long page_size =
-      static_cast<int64_t>(sysconf(_SC_PAGESIZE));
-
-  mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
-  vm_statistics_data_t vm_stat;
-  if (host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vm_stat,
-                      &count) == KERN_SUCCESS) {
-    const long long active_mem =
-        static_cast<int64_t>(vm_stat.active_count) * page_size;
-    const long long wired_mem =
-        static_cast<int64_t>(vm_stat.wire_count) * page_size;
-    info.used = active_mem + wired_mem;
-  }
-
-  if (info.total > 0) {
-    info.percent = (static_cast<double>(info.used) / info.total) * 100.0;
-  }
-  return info;
-}
-
 struct DiskInfo {
   uint64_t total;
   uint64_t used;
   double percent;
 };
-
-inline DiskInfo getDiskInfo() {
-  DiskInfo info{};
-  struct statfs stats;
-  if (statfs("/", &stats) == 0) {
-    info.total = static_cast<uint64_t>(stats.f_blocks) * stats.f_bsize;
-    const uint64_t free = static_cast<uint64_t>(stats.f_bfree) * stats.f_bsize;
-    info.used = info.total - free;
-    if (info.total > 0) {
-      info.percent = (static_cast<double>(info.used) / info.total) * 100.0;
-    }
-  }
-  return info;
-}
 
 struct LoginInfo {
   std::string time;
@@ -438,101 +275,245 @@ struct LoginInfo {
   std::string uptime;
 };
 
-inline LoginInfo getLastLogin() {
-  LoginInfo info{};
-  info.ip_present = false;
+inline std::string getOSName() {
+  std::string product_name = execCommand("sw_vers -productName");
+  std::string product_version = execCommand("sw_vers -productVersion");
+  if (!product_name.empty() && !product_version.empty()) {
+    return product_name + " " + product_version;
+  }
 
-  const char *user = getenv("USER");
-  std::string cmd = "last -1 ";
-  cmd += user;
-  cmd += " 2>/dev/null | head -1";
-  const std::string last_login = execCommand(cmd.c_str());
-
-  if (last_login.empty() ||
-      last_login.find("never logged in") != std::string::npos) {
-    info.time = "Never logged in";
-  } else {
-    std::stringstream ss(last_login);
-    std::string segment;
-    std::vector<std::string> parts;
-    parts.reserve(10);
-    while (ss >> segment)
-      parts.push_back(segment);
-
-    int date_start_idx = 2;
-    if (parts.size() > 2) {
-      if (std::isdigit(parts[2][0]) &&
-          parts[2].find('.') != std::string::npos) {
-        info.ip = parts[2];
-        info.ip_present = true;
-        date_start_idx = 3;
-      }
-    }
-
-    if (parts.size() >= static_cast<size_t>(date_start_idx + 4)) {
-      info.time = parts[date_start_idx] + " " + parts[date_start_idx + 1] +
-                  " " + parts[date_start_idx + 2] + " " +
-                  parts[date_start_idx + 3];
-    } else {
-      info.time = last_login;
+  size_t size = 0;
+  sysctlbyname("kern.ostype", nullptr, &size, nullptr, 0);
+  std::string os_type = "macOS";
+  if (size > 1) {
+    std::vector<char> buffer(size);
+    sysctlbyname("kern.ostype", buffer.data(), &size, nullptr, 0);
+    if (size > 0 && buffer[size - 1] == '\0') {
+      os_type = std::string(buffer.data());
     }
   }
 
-  std::string uptime_raw = execCommand("uptime");
-  const size_t up_pos = uptime_raw.find("up ");
-  if (up_pos != std::string::npos) {
-    std::string sub = uptime_raw.substr(up_pos + 3);
-    const size_t comma_pos = sub.find(",");
-    if (comma_pos != std::string::npos) {
-      std::string part1 = sub.substr(0, comma_pos);
-      std::string time_part = "";
+  size = 0;
+  sysctlbyname("kern.osrelease", nullptr, &size, nullptr, 0);
+  std::string os_release = "";
+  if (size > 1) {
+    std::vector<char> buffer(size);
+    sysctlbyname("kern.osrelease", buffer.data(), &size, nullptr, 0);
+    if (size > 0 && buffer[size - 1] == '\0') {
+      os_release = std::string(buffer.data());
+    }
+  }
+  return os_type + " " + os_release;
+}
 
-      if (part1.find("day") != std::string::npos) {
-        const size_t comma2_pos = sub.find(",", comma_pos + 1);
-        if (comma2_pos != std::string::npos) {
-          time_part = sub.substr(comma_pos + 1, comma2_pos - comma_pos - 1);
-        }
+inline std::string getKernelVersion() {
+  size_t size = 0;
+  sysctlbyname("kern.version", nullptr, &size, nullptr, 0);
+  if (size > 1) {
+    std::vector<char> buffer(size);
+    sysctlbyname("kern.version", buffer.data(), &size, nullptr, 0);
+    if (size > 0) {
+      std::string version(buffer.data());
+      size_t newline = version.find('\n');
+      if (newline != std::string::npos) {
+        version = version.substr(0, newline);
+      }
+      return version;
+    }
+  }
+  return "unknown";
+}
 
-        size_t p;
-        while ((p = part1.find(" days")) != std::string::npos)
-          part1.replace(p, 5, "d");
-        while ((p = part1.find(" day")) != std::string::npos)
-          part1.replace(p, 4, "d");
-        part1.erase(std::remove(part1.begin(), part1.end(), ' '), part1.end());
+inline std::string getHostname() {
+  char hostname[256];
+  if (gethostname(hostname, sizeof(hostname)) == 0) {
+    return std::string(hostname);
+  }
+  return "unknown";
+}
 
-        time_part.erase(0, time_part.find_first_not_of(" "));
-        const size_t colon = time_part.find(":");
-        if (colon != std::string::npos) {
-          const std::string hours = time_part.substr(0, colon);
-          const std::string mins = time_part.substr(colon + 1);
-          info.uptime = part1 + " " + hours + "h " + mins + "m";
-        } else {
-          info.uptime = part1;
-        }
-      } else {
-        part1.erase(0, part1.find_first_not_of(" "));
-        const size_t colon = part1.find(":");
-        if (colon != std::string::npos) {
-          const std::string hours = part1.substr(0, colon);
-          const std::string mins = part1.substr(colon + 1);
-          info.uptime = hours + "h " + mins + "m";
-        } else {
-          info.uptime = part1;
+inline std::string getMachineIP() {
+  struct ifaddrs *ifaddrs_ptr;
+  if (getifaddrs(&ifaddrs_ptr) != 0) {
+    return "unknown";
+  }
+
+  std::string ip;
+  for (struct ifaddrs *ifa = ifaddrs_ptr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) continue;
+    if (ifa->ifa_addr->sa_family != AF_INET) continue;
+    if (std::string(ifa->ifa_name).find("lo") == 0) continue;
+
+    struct sockaddr_in *sin = (struct sockaddr_in *)ifa->ifa_addr;
+    char ip_str[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &sin->sin_addr, ip_str, INET_ADDRSTRLEN) != nullptr) {
+      ip = std::string(ip_str);
+      break;
+    }
+  }
+  freeifaddrs(ifaddrs_ptr);
+  return ip.empty() ? "unknown" : ip;
+}
+
+inline std::string getClientIP() {
+  const char *ssh_client = getenv("SSH_CLIENT");
+  if (ssh_client != nullptr) {
+    std::string client(ssh_client);
+    size_t space = client.find(' ');
+    if (space != std::string::npos) {
+      return client.substr(0, space);
+    }
+    return client;
+  }
+  return "N/A";
+}
+
+inline std::vector<std::string> getDNS() {
+  std::vector<std::string> dns_servers;
+  std::string output = execCommand("scutil --dns | grep 'nameserver\\[0\\]' | head -3");
+  if (!output.empty()) {
+    std::istringstream iss(output);
+    std::string line;
+    while (std::getline(iss, line)) {
+      size_t colon = line.find(':');
+      if (colon != std::string::npos) {
+        std::string ip = line.substr(colon + 1);
+        while (!ip.empty() && ip[0] == ' ') ip.erase(0, 1);
+        if (!ip.empty()) {
+          dns_servers.push_back(ip);
         }
       }
     }
+  }
+  if (dns_servers.empty()) {
+    dns_servers.push_back("N/A");
+  }
+  return dns_servers;
+}
+
+inline std::string getCurrentUser() {
+  struct passwd *pw = getpwuid(getuid());
+  if (pw != nullptr && pw->pw_name != nullptr) {
+    return std::string(pw->pw_name);
+  }
+  return "unknown";
+}
+
+inline CPUInfo getCPUInfo() {
+  CPUInfo info;
+
+  size_t size = 0;
+  sysctlbyname("machdep.cpu.brand_string", nullptr, &size, nullptr, 0);
+  if (size > 1) {
+    std::vector<char> buffer(size);
+    sysctlbyname("machdep.cpu.brand_string", buffer.data(), &size, nullptr, 0);
+    if (size > 0) {
+      info.model = std::string(buffer.data());
+    } else {
+      info.model = "Unknown CPU";
+    }
+  } else {
+    info.model = "Unknown CPU";
+  }
+
+  size = sizeof(int);
+  sysctlbyname("hw.physicalcpu", &info.cores_physical, &size, nullptr, 0);
+  sysctlbyname("hw.logicalcpu", &info.cores_logical, &size, nullptr, 0);
+  sysctlbyname("hw.packages", &info.sockets, &size, nullptr, 0);
+
+  struct loadavg load;
+  size = sizeof(load);
+  if (sysctlbyname("vm.loadavg", &load, &size, nullptr, 0) == 0) {
+    info.load_1 = static_cast<double>(load.ldavg[0]) / static_cast<double>(load.fscale);
+    info.load_5 = static_cast<double>(load.ldavg[1]) / static_cast<double>(load.fscale);
+    info.load_15 = static_cast<double>(load.ldavg[2]) / static_cast<double>(load.fscale);
+  } else {
+    info.load_1 = info.load_5 = info.load_15 = 0.0;
   }
 
   return info;
 }
 
-inline std::string getCurrentUser() {
-  static std::string cached_user;
-  if (cached_user.empty()) {
-    const char *user_env = getenv("USER");
-    cached_user = user_env ? user_env : "";
+inline MemInfo getMemInfo() {
+  MemInfo info;
+  vm_size_t page_size;
+  vm_statistics64_data_t vm_stat;
+  mach_msg_type_number_t host_size = sizeof(vm_statistics64_data_t) / sizeof(natural_t);
+
+  host_page_size(mach_host_self(), &page_size);
+
+  if (host_statistics64(mach_host_self(), HOST_VM_INFO64, (host_info64_t)&vm_stat, &host_size) == KERN_SUCCESS) {
+    uint64_t total_mem;
+    size_t size = sizeof(total_mem);
+    sysctlbyname("hw.memsize", &total_mem, &size, nullptr, 0);
+
+    uint64_t used_mem = (vm_stat.active_count + vm_stat.wire_count) * page_size;
+    info.total = total_mem;
+    info.used = used_mem;
+    info.percent = (static_cast<double>(used_mem) / static_cast<double>(total_mem)) * 100.0;
+  } else {
+    info.total = info.used = 0;
+    info.percent = 0.0;
   }
-  return cached_user;
+
+  return info;
+}
+
+inline DiskInfo getDiskInfo() {
+  DiskInfo info;
+  struct statfs fs;
+  if (statfs("/", &fs) == 0) {
+    uint64_t total_bytes = fs.f_blocks * fs.f_bsize;
+    uint64_t free_bytes = fs.f_bavail * fs.f_bsize;
+    uint64_t used_bytes = total_bytes - free_bytes;
+
+    info.total = total_bytes;
+    info.used = used_bytes;
+    info.percent = (static_cast<double>(used_bytes) / static_cast<double>(total_bytes)) * 100.0;
+  } else {
+    info.total = info.used = 0;
+    info.percent = 0.0;
+  }
+
+  return info;
+}
+
+inline LoginInfo getLastLogin() {
+  LoginInfo info;
+  std::string last_cmd = execCommand("last -1 -t console | head -1");
+  if (!last_cmd.empty()) {
+    std::istringstream iss(last_cmd);
+    std::string token;
+    std::vector<std::string> tokens;
+    while (iss >> token) {
+      tokens.push_back(token);
+    }
+    if (tokens.size() >= 6) {
+      info.time = tokens[2] + " " + tokens[3] + " " + tokens[4] + " " + tokens[5];
+      info.ip_present = false;
+    } else if (tokens.size() >= 4) {
+      info.time = tokens[2] + " " + tokens[3];
+      if (tokens.size() >= 5) {
+        info.time += " " + tokens[4];
+      }
+      info.ip_present = false;
+    } else {
+      info.time = "N/A";
+      info.ip_present = false;
+    }
+  } else {
+    info.time = "N/A";
+    info.ip_present = false;
+  }
+
+  std::string uptime_cmd = execCommand("uptime | sed 's/.*up \\([^,]*\\).*/\\1/'");
+  if (!uptime_cmd.empty()) {
+    info.uptime = uptime_cmd;
+  } else {
+    info.uptime = "N/A";
+  }
+
+  return info;
 }
 
 int main() {
@@ -574,11 +555,16 @@ int main() {
               << "%]";
   const std::string disk_usage_str = disk_str_ss.str();
 
+  std::string cpu_model_with_kaomoji = std::string(KAWAII_CPU) + " " + cpu.model;
+  std::string disk_usage_with_kaomoji = std::string(KAWAII_DISK) + " " + disk_usage_str;
+  std::string mem_usage_with_kaomoji = std::string(KAWAII_MEM) + " " + mem_usage_str;
+  std::string login_time_with_kaomoji = std::string(KAWAII_TIME) + " " + login.time;
+
   std::vector<std::string> all_strings = {
       REPORT_TITLE,   os_name,       os_kernel,        net_hostname,
-      net_machine_ip, net_client_ip, net_current_user, cpu.model,
-      cpu_cores_str,  "Bare Metal",  cpu_usage_str,    mem_usage_str,
-      disk_usage_str, login.time,    login.ip,         login.uptime};
+      net_machine_ip, net_client_ip, net_current_user, cpu_model_with_kaomoji,
+      cpu_cores_str,  "Bare Metal",  cpu_usage_str,    mem_usage_with_kaomoji,
+      disk_usage_with_kaomoji, login_time_with_kaomoji, login.ip, login.uptime};
 
   const int current_len = maxLength(all_strings);
 
@@ -598,47 +584,46 @@ int main() {
   const std::string disk_graph = drawBarGraph(disk.percent, graph_width);
 
   printHeader(current_len);
-  printCenteredData(REPORT_TITLE, current_len);
-  printCenteredData("TR-1000 MACHINE REPORT", current_len);
+  printCenteredData("✧･ﾟ: *✧･ﾟ:* SYSTEM STATUS REPORT *:･ﾟ✧*:･ﾟ✧", current_len, PINK);
+  printCenteredData("uwu TR-1000 Machine Report (◕‿◕✿)", current_len, CYAN);
   printDivider("top", current_len);
 
-  printData("OS", os_name, current_len);
-  printData("KERNEL", os_kernel, current_len);
+  printData("OS", os_name, current_len, CYAN, "");
+  printData("KERNEL", os_kernel, current_len, CYAN, "");
   printDivider("", current_len);
 
-  printData("HOSTNAME", net_hostname, current_len);
-  printData("MACHINE IP", net_machine_ip, current_len);
-  printData("CLIENT  IP", net_client_ip, current_len);
+  printData("HOSTNAME", net_hostname, current_len, BLUE, "");
+  printData("MACHINE IP", net_machine_ip, current_len, BLUE, "");
+  printData("CLIENT IP", net_client_ip, current_len, BLUE, "");
   for (size_t i = 0; i < net_dns_ip.size(); ++i) {
-    printData("DNS  IP " + std::to_string(i + 1), net_dns_ip[i], current_len);
+    printData("DNS IP " + std::to_string(i + 1), net_dns_ip[i], current_len, BLUE, "");
   }
-  printData("USER", net_current_user, current_len);
+  printData("USER", net_current_user, current_len, PURPLE, "");
   printDivider("", current_len);
 
-  printData("PROCESSOR", cpu.model, current_len);
-  printData("CORES", cpu_cores_str, current_len);
-  printData("HYPERVISOR", "Bare Metal", current_len);
-  printData("CPU USAGE", cpu_usage_str, current_len);
-  printData("LOAD  1m", cpu_1_graph, current_len);
-  printData("LOAD  5m", cpu_5_graph, current_len);
-  printData("LOAD 15m", cpu_15_graph, current_len);
+  printData("PROCESSOR", cpu.model, current_len, YELLOW, KAWAII_CPU);
+  printData("CORES", cpu_cores_str, current_len, YELLOW, "");
+  printData("HYPERVISOR", "Bare Metal", current_len, YELLOW, "");
+  printData("CPU USAGE", cpu_usage_str, current_len, YELLOW, "");
+  printData("LOAD 1m", cpu_1_graph, current_len, GREEN, "");
+  printData("LOAD 5m", cpu_5_graph, current_len, GREEN, "");
+  printData("LOAD 15m", cpu_15_graph, current_len, GREEN, "");
   printDivider("", current_len);
 
-  printData("VOLUME", disk_usage_str, current_len);
-  printData("DISK USAGE", disk_graph, current_len);
+  printData("VOLUME", disk_usage_str, current_len, PINK, KAWAII_DISK);
+  printData("DISK USAGE", disk_graph, current_len, PINK, "");
   printDivider("", current_len);
 
-  printData("MEMORY", mem_usage_str, current_len);
-  printData("USAGE", mem_graph, current_len);
+  printData("MEMORY", mem_usage_str, current_len, PURPLE, KAWAII_MEM);
+  printData("USAGE", mem_graph, current_len, PURPLE, "");
   printDivider("", current_len);
 
-  printData("LAST LOGIN", login.time, current_len);
-  if (login.ip_present) {
-    printData("", login.ip, current_len);
-  }
-  printData("UPTIME", login.uptime, current_len);
+  printData("LAST LOGIN", login.time, current_len, CYAN, KAWAII_TIME);
+  printData("UPTIME", login.uptime, current_len, GREEN, "");
 
   printDivider("bottom", current_len);
 
   return 0;
 }
+
+// Copy all unchanged helpers (getOSName, getDiskInfo, getDNS etc.) below this

@@ -1,0 +1,2 @@
+machine_report: .026s
+fastfetch: .050s
