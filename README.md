@@ -9,11 +9,13 @@ This tool is a native port of a Linux shell script, designed to provide accurate
 - **uwu aesthetic**: Cute kaomoji, pastel colors, and adorable formatting ✧(｡•̀ᴗ-)✧
 - **System Information**: OS version, Kernel version, Hostname
 - **Network**: Machine IP, Client IP (if connected via SSH), DNS servers
-- **CPU**: Processor model, Core count (Physical/Logical), Socket count, and CPU Usage percentage
+- **CPU**: Processor model, Core count, and CPU Usage percentage (integer format)
 - **Memory**: Real-time memory usage (Active + Wired) with visual bar graph
 - **Disk**: Root partition usage with visual bar graph
 - **Load Averages**: 1, 5, and 15-minute load averages with visual bar graphs
-- **User Activity**: Current user, Last login time, and System uptime
+- **User Activity**: Current user, Last login time (day + 12-hour format), and System uptime
+- **Integer Formatting**: All percentages and storage values displayed as integers for cleaner output
+- **Lowercase Display**: All labels and text in lowercase for consistent uwu aesthetic
 
 ## Performance Optimizations
 
@@ -82,23 +84,24 @@ Performance comparison against [fastfetch](https://github.com/fastfetch-cli/fast
 
 | Metric | machine_report | fastfetch | Winner |
 |--------|----------------|-----------|--------|
-| **Execution Time** | 0.063s | 0.038s | fastfetch |
+| **Execution Time** | 0.026s | 0.052s | machine_report |
 | **Memory Usage** | 9.56 MB | 9.69 MB | machine_report |
 | **Binary Size** | ~50 KB | ~800 KB | machine_report |
 
 ### Analysis
 
-**Fastfetch Advantages:**
-- **Faster execution** (~40% faster) - Highly optimized C codebase with minimal overhead
-- **Rich features** - Extensive customization, logos, and display options
-- **Mature ecosystem** - Well-established project with broad platform support
-
 **Machine_report Advantages:**
+- **Faster execution** (~2x faster) - Highly optimized C++ codebase with async operations
 - **Lower memory footprint** - Slightly more memory efficient
 - **Smaller binary** - 16x smaller executable size
 - **Focused scope** - Designed specifically for macOS system reporting
 - **Minimal dependencies** - Only standard system libraries
 - **Detailed metrics** - Specific focus on system administration needs
+- **uwu aesthetic** - Cute formatting with Japanese characters and pastel colors
+
+**Fastfetch Advantages:**
+- **Rich features** - Extensive customization, logos, and display options
+- **Mature ecosystem** - Well-established project with broad platform support
 
 ### Running Benchmarks
 
@@ -112,7 +115,7 @@ To run the benchmark suite yourself:
 
 ### Performance
 
-Typical execution time: **~0.06 seconds** on Apple Silicon (M3 Pro)
+Typical execution time: **~0.026 seconds** on Apple Silicon (M2/M3)
 
 The asynchronous architecture allows the program to:
 - Start processing immediately
@@ -122,32 +125,37 @@ The asynchronous architecture allows the program to:
 ## Example Output
 
 ```
-✧･ﾟ: *✧･ﾟ:* SYSTEM STATUS REPORT *:･ﾟ✧*:･ﾟ✧
-uwu TR-1000 Machine Report (◕‿◕✿)
-
-OS:             macOS 26.1
-KERNEL:         Darwin Kernel Version 25.1.0...
-
-HOSTNAME:       Priyanshus-MacBook-Air.local
-MACHINE IP:     10.146.3.51
-CLIENT IP:      N/A
-DNS IP 1:       45.112.149.2
-USER:           priyanshusharma
-
-PROCESSOR:      ᕙ(⇀‸↼‶)ᕗ Apple M2
-CORES:          8 vCPU(s) / 1 Socket(s)
-HYPERVISOR:     Bare Metal
-CPU USAGE:      27.06%
-LOAD 1m:        ▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱
-
-VOLUME:         ✧(｡•̀ᴗ-)✧ 130.85/228.27 GB [57.32%]
-DISK USAGE:     ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱
-
-MEMORY:         (｡◕‿◕｡) 7.94/16.00 GiB [49.60%]
-USAGE:          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱
-
-LAST LOGIN:     ⸜(｡˃ ᵕ ˂ )⸝♡ Wed Nov 19 22:34
-UPTIME:          3:22
+╭──────────────────────────────────────────────────╮
+│   ✧･ﾟ: *✧･ﾟ:* SYSTEM STATUS REPORT *:･ﾟ✧*:･ﾟ✧    │
+│        uwu TR-1000 Machine Report (◕‿◕✿)         │
+├──────────────────────────────────────────────────┤
+│ os:             macos 26.1                       │
+│ kernel:         darwin kernel version 25.1.0...  │
+├──────────────────────────────────────────────────┤
+│ hostname:       priyanshus-macbook-air.local     │
+│ machine ip:     10.146.3.51                      │
+│ client ip:      n/a                              │
+│ dns ip 1:       45.112.149.2                     │
+│ dns ip 2:       45.112.149.2                     │
+│ user:           priyanshusharma                  │
+├──────────────────────────────────────────────────┤
+│ processor:      しょり apple m2                   │
+│ cores:          8 cores                          │
+│ hypervisor:     bare metal                       │
+│ cpu usage:      26%                              │
+│ load 1m:        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   │
+│ load 5m:        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱    │
+│ load 15m:       ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱     │
+├──────────────────────────────────────────────────┤
+│ volume:         きおくいき 130/228 gb [57%]        │
+│ disk usage:     ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱    │
+├──────────────────────────────────────────────────┤
+│ memory:         きおく 8/16 gib [51%]             │
+│ usage:          ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱    │
+├──────────────────────────────────────────────────┤
+│ last login:     じこく wed 10:34 pm               │
+│ uptime:          3:49                            │
+╰──────────────────────────────────────────────────╯
 ```
 
 ## Technical Details
